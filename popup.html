@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Wolt Blocker</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="popup">
+      <section class="panel">
+        <p class="eyebrow">Wolt Blocker</p>
+        <h1>Hide places you never want to order from.</h1>
+        <p id="status" class="status">Checking this tab…</p>
+        <button id="toggle-current" class="primary" type="button" disabled>Open a Wolt venue page</button>
+      </section>
+      <section class="panel panel-tight">
+        <div class="row">
+          <span>Blocked places</span>
+          <strong id="blocked-count">0</strong>
+        </div>
+        <button id="open-options" class="secondary" type="button">Manage blocked list</button>
+      </section>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

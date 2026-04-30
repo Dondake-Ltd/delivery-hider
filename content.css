@@ -1,0 +1,73 @@
+.wolt-blocker-hide-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2147483647;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.9);
+  color: #fff;
+  cursor: pointer;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 8px 12px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+  transition: transform 120ms ease, background 120ms ease, opacity 120ms ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-wolt-blocker-root]:hover .wolt-blocker-hide-button,
+[data-wolt-blocker-root]:focus-within .wolt-blocker-hide-button,
+.wolt-blocker-hide-button:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.wolt-blocker-hide-button:hover,
+.wolt-blocker-hide-button:focus-visible {
+  background: rgba(220, 38, 38, 0.95);
+  transform: translateY(-1px);
+}
+
+[data-wolt-blocker-hidden="true"] {
+  display: none !important;
+}
+
+.wolt-blocker-page-banner {
+  position: sticky;
+  top: 12px;
+  z-index: 2147483647;
+  margin: 12px auto;
+  width: min(720px, calc(100% - 24px));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: rgba(17, 24, 39, 0.94);
+  color: #fff;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.22);
+}
+
+.wolt-blocker-page-banner strong {
+  display: block;
+  font: 700 14px/1.2 system-ui, sans-serif;
+}
+
+.wolt-blocker-page-banner span {
+  display: block;
+  font: 400 12px/1.35 system-ui, sans-serif;
+  opacity: 0.84;
+}
+
+.wolt-blocker-page-banner button {
+  border: 0;
+  border-radius: 999px;
+  background: #00c2e8;
+  color: #042a36;
+  cursor: pointer;
+  font: 700 12px/1 system-ui, sans-serif;
+  padding: 10px 14px;
+  white-space: nowrap;
+}

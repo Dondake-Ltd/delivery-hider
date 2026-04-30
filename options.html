@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Wolt Blocker Settings</title>
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">Wolt Blocker</p>
+        <h1>Blocked restaurants and shops</h1>
+        <p class="subtle">Anything here stays hidden across Wolt listing pages until you remove it.</p>
+      </header>
+
+      <section class="controls">
+        <input id="search" type="search" placeholder="Search blocked places">
+        <button id="clear-all" type="button">Clear all</button>
+      </section>
+
+      <section class="list-wrap">
+        <p id="empty-state" class="empty">You have not blocked anything yet.</p>
+        <ul id="blocked-list" class="list"></ul>
+      </section>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

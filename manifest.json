@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Wolt Blocker",
+  "version": "1.0.0",
+  "description": "Hide restaurants and shops on wolt.com that you never want to see again.",
+  "icons": {
+    "16": "store-assets/icon16.png",
+    "32": "store-assets/icon32.png",
+    "48": "store-assets/icon48.png",
+    "128": "store-assets/icon128.png"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "action": {
+    "default_title": "Wolt Blocker",
+    "default_icon": {
+      "16": "store-assets/icon16.png",
+      "32": "store-assets/icon32.png"
+    },
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://wolt.com/*"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
