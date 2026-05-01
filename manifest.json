@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Wolt Blocker",
+  "name": "Delivery Hider",
   "version": "1.0.0",
-  "description": "Hide restaurants and shops on wolt.com that you never want to see again.",
+  "description": "Hide restaurants and shops on supported delivery platforms that you never want to see again.",
   "icons": {
     "16": "store-assets/icon16.png",
     "32": "store-assets/icon32.png",
@@ -24,7 +24,10 @@
   "content_scripts": [
     {
       "matches": [
-        "https://wolt.com/*"
+        "https://wolt.com/*",
+        "https://foody.com.cy/*",
+        "https://www.foody.com.cy/*",
+        "https://food.bolt.eu/*"
       ],
       "css": [
         "content.css"

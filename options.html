@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Wolt Blocker Settings</title>
+    <title>Delivery Hider Settings</title>
     <link rel="stylesheet" href="options.css">
   </head>
   <body>
     <main class="page">
       <header class="hero">
-        <p class="eyebrow">Wolt Blocker</p>
+        <p class="eyebrow">Delivery Hider</p>
         <h1>Blocked restaurants and shops</h1>
-        <p class="subtle">Anything here stays hidden across Wolt listing pages until you remove it.</p>
+        <p class="subtle">Anything here stays hidden across supported delivery listings until you remove it.</p>
       </header>
 
       <section class="controls">
@@ -19,7 +19,39 @@
         <button id="clear-all" type="button">Clear all</button>
       </section>
 
+      <section class="telemetry">
+        <div class="telemetry-copy">
+          <p class="eyebrow">Telemetry Foundation</p>
+          <h2>Community stats is not live yet</h2>
+          <p class="subtle">You can opt in now to the future anonymous sharing model. This release does not send anything to a server, but it can queue the exact event shape locally so the consent flow and reset controls are already in place.</p>
+        </div>
+        <label class="toggle-row" for="telemetry-enabled">
+          <div>
+            <strong>Share anonymous hide/unhide stats later</strong>
+            <span>Platform, place name, place key, action, country, extension version, and coarse timestamp.</span>
+          </div>
+          <input id="telemetry-enabled" type="checkbox">
+        </label>
+        <div class="telemetry-actions">
+          <button id="reset-telemetry" type="button">Clear queued telemetry</button>
+        </div>
+        <div class="telemetry-preview">
+          <div class="telemetry-meta">
+            <strong id="telemetry-queue-count">0 queued events</strong>
+            <span id="telemetry-status">Telemetry sending is disabled in this release.</span>
+          </div>
+          <pre id="telemetry-preview-json"></pre>
+        </div>
+      </section>
+
       <section class="list-wrap">
+        <div class="stats-header">
+          <div>
+            <strong>Top blocked locally</strong>
+            <p>Your own hide history only. No server-side telemetry.</p>
+          </div>
+        </div>
+        <ul id="top-blocked-list" class="list list-compact"></ul>
         <p id="empty-state" class="empty">You have not blocked anything yet.</p>
         <ul id="blocked-list" class="list"></ul>
       </section>

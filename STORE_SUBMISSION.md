@@ -14,17 +14,17 @@ This repo now includes the minimum assets and copy needed for a first Chrome Web
   - `store-assets/screenshot-1-1280x800.png`
   - `store-assets/screenshot-2-1280x800.png`
 - Upload package:
-  - `wolt-blocker-store.zip`
+  - `delivery-hider-store.zip`
 
 ## Suggested listing values
 
 ### Name
 
-`Wolt Blocker`
+`Delivery Hider`
 
 ### Summary
 
-`Hide restaurants and shops on Wolt that you never want to see again.`
+`Hide restaurants and shops on supported delivery platforms that you never want to see again.`
 
 ### Category
 
@@ -36,34 +36,35 @@ This repo now includes the minimum assets and copy needed for a first Chrome Web
 
 ### Detailed description
 
-`Wolt Blocker adds a simple hide button to restaurants and shops on wolt.com so you can remove places you know you will never order from.
+`Delivery Hider adds a simple hide button to restaurants and shops on supported delivery platforms so you can remove places you know you will never order from.
 
-Block a venue once and it disappears from Wolt listing pages wherever it shows up again. You can also block or unblock the current venue from the extension popup, and manage your full blocked list from the options page.
+Hide a place once and it disappears from supported listing pages wherever it shows up again. You can also hide or unhide the current place from the extension popup, and manage your full hidden list from the options page.
 
 Features:
-- Hide restaurants and shops directly from Wolt cards
-- Keep blocked venues hidden across Wolt listing pages
-- Block or unblock the current venue from the popup
-- Review and remove blocked venues from a searchable management page
+- Hide restaurants and shops directly from supported delivery cards
+- Keep hidden places hidden across supported listing pages
+- Hide or unhide the current place from the popup
+- Review and remove hidden places from a searchable management page
+- See a local-only top blocked list based on your own hide history
+- Configure an opt-in telemetry setting that currently queues anonymous events locally only
 
-Wolt Blocker stores your blocked list in Chrome storage and does not send your data to any external server.`
+Supported platforms currently include Wolt, Foody, and Bolt Food web pages where compatible.
+
+Delivery Hider stores your hidden list, local hide/unhide counts, and optional local-only queued telemetry events in Chrome storage and does not send your data to any external server in this release.`
 
 ## Privacy tab text
 
 ### Single purpose description
 
-`Lets users hide specific restaurants and shops on wolt.com and keep those venues out of Wolt listings.`
+`Lets users hide specific restaurants and shops on supported delivery platforms and keep those venues out of listings.`
 
 ### Permission justifications
 
 `storage`
-Stores the user's blocked-venue list locally in Chrome sync storage so hidden venues stay hidden.
+Stores the user's hidden-place list, local hide/unhide counts, telemetry consent setting, and optional local-only queued telemetry events so hidden venues stay hidden, the local top-blocked view can work, and the future telemetry consent flow can be tested without any network transmission.
 
-`tabs`
-Reads the active tab URL and title in the popup so the extension can block or unblock the currently open Wolt venue.
-
-`host permission: https://wolt.com/*`
-Runs the content script on wolt.com pages so it can add hide controls and remove blocked venues from the page.
+`host permissions`
+Runs the content script on supported delivery websites so it can add hide controls and remove hidden venues from listings.
 
 ## Privacy policy recommendation
 
@@ -71,12 +72,13 @@ Because this extension does not collect or transmit personal or sensitive user d
 
 Suggested policy text:
 
-`Wolt Blocker does not collect, sell, or transmit personal data to external servers. The extension stores only the user's blocked venue list in Chrome storage so hidden venues remain hidden across Wolt pages.`
+`Delivery Hider does not collect, sell, or transmit personal data to external servers in the current release. The extension stores only the user's hidden venue list, local hide/unhide counts, telemetry consent setting, and optional local-only queued telemetry events in Chrome storage so hidden venues remain hidden across supported delivery pages.`
 
 ## Test instructions
 
-`1. Open wolt.com and browse any city discovery or restaurant listing page.
-2. Hover a restaurant or shop card and click Hide.
-3. Confirm the venue disappears from the page.
-4. Open the extension popup while on a venue page and block or unblock the current venue.
-5. Open the options page and confirm the blocked list can be searched and edited.`
+`1. Open wolt.com, foody.com.cy, or food.bolt.eu and browse a restaurant or store listing page.
+2. Hover a supported card and click Hide.
+3. Confirm the place disappears from the page.
+4. Open the extension popup while on a supported place page and hide or unhide the current place.
+5. Open the options page and confirm the hidden list can be searched and edited.
+6. Confirm the local-only top blocked list updates as you hide and unhide places.`

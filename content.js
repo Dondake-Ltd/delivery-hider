@@ -1,69 +1,121 @@
 (function () {
   const STORAGE_KEY = "blockedVenues";
-  const ROOT_ATTR = "data-wolt-blocker-root";
-  const BUTTON_ATTR = "data-wolt-blocker-button";
-  const PAGE_BANNER_ATTR = "data-wolt-blocker-page-banner";
+  const STATS_KEY = "localStats";
+  const TELEMETRY_SETTINGS_KEY = "telemetrySettings";
+  const TELEMETRY_QUEUE_KEY = "telemetryQueue";
+  const ROOT_ATTR = "data-delivery-hider-root";
+  const BUTTON_ATTR = "data-delivery-hider-button";
+  const PAGE_BANNER_ATTR = "data-delivery-hider-page-banner";
+  const PAGE_BUTTON_ATTR = "data-delivery-hider-page-button";
+  const MESSAGE_TYPE = "DELIVERY_HIDER_GET_PAGE_STATE";
   const processedRoots = new WeakSet();
+
+  const adapters = [
+    createWoltAdapter(),
+    createFoodyAdapter(),
+    createBoltFoodAdapter()
+  ];
+
   let blockedVenues = {};
+  let localStats = {};
+  let telemetrySettings = {};
+  let telemetryQueue = [];
   let scanTimer = null;
   let observer = null;
+  let activeAdapter = null;
 
   init().catch((error) => {
-    console.error("Wolt Blocker init failed", error);
+    console.error("Delivery Hider init failed", error);
   });
 
   async function init() {
-    blockedVenues = await loadBlockedVenues();
-    injectPageBannerIfNeeded();
+    activeAdapter = getActiveAdapter();
+    if (!activeAdapter) {
+      return;
+    }
+
+    blockedVenues = await loadObject(STORAGE_KEY);
+    localStats = await loadObject(STATS_KEY);
+    telemetrySettings = await loadObject(TELEMETRY_SETTINGS_KEY);
+    telemetryQueue = await loadArray(TELEMETRY_QUEUE_KEY);
+
+    injectPageButtonIfNeeded();
     scanPage();
+
     observer = new MutationObserver(scheduleScan);
     observer.observe(document.documentElement, {
       childList: true,
       subtree: true
     });
+
     chrome.storage.onChanged.addListener(handleStorageChange);
     chrome.runtime.onMessage.addListener(handleRuntimeMessage);
   }
 
   function handleRuntimeMessage(message, _sender, sendResponse) {
-    if (message?.type !== "WOLT_BLOCKER_GET_PAGE_STATE") {
+    if (message?.type !== MESSAGE_TYPE) {
       return;
     }
 
-    const currentVenue = getVenueFromPathname(location.pathname, document.querySelector("h1")?.textContent || "");
+    const adapter = getActiveAdapter();
+    const venue = adapter ? adapter.getCurrentVenue() : null;
     sendResponse({
-      isWolt: location.hostname === "wolt.com",
-      venue: currentVenue,
-      isBlocked: currentVenue ? isBlocked(currentVenue.key) : false
+      isSupported: Boolean(adapter),
+      platform: adapter ? getPlatformSummary(adapter.id) : null,
+      venue,
+      isBlocked: venue ? isBlocked(venue.key) : false
     });
   }
 
   function handleStorageChange(changes, areaName) {
-    if (areaName !== "sync" || !changes[STORAGE_KEY]) {
+    if (areaName !== "sync") {
       return;
     }
-    blockedVenues = changes[STORAGE_KEY].newValue || {};
-    injectPageBannerIfNeeded();
-    scanPage();
+
+    if (changes[STORAGE_KEY]) {
+      blockedVenues = changes[STORAGE_KEY].newValue || {};
+    }
+
+    if (changes[STATS_KEY]) {
+      localStats = changes[STATS_KEY].newValue || {};
+    }
+
+    if (changes[TELEMETRY_SETTINGS_KEY]) {
+      telemetrySettings = changes[TELEMETRY_SETTINGS_KEY].newValue || {};
+    }
+
+    if (changes[TELEMETRY_QUEUE_KEY]) {
+      telemetryQueue = changes[TELEMETRY_QUEUE_KEY].newValue || [];
+    }
+
+    if (activeAdapter) {
+      injectPageButtonIfNeeded();
+      scanPage();
+    }
   }
 
   function scheduleScan() {
     window.clearTimeout(scanTimer);
     scanTimer = window.setTimeout(() => {
-      injectPageBannerIfNeeded();
+      injectPageButtonIfNeeded();
       scanPage();
     }, 120);
   }
 
   function scanPage() {
-    const links = document.querySelectorAll("a[href*='/restaurant/'], a[href*='/venue/']");
+    if (!activeAdapter) {
+      return;
+    }
+
+    const links = activeAdapter.getListingLinks();
     const seenKeys = new Set();
 
     for (const link of links) {
-      const venue = getVenueFromLink(link);
+      const venue = activeAdapter.getVenueFromLink(link);
       if (!venue || seenKeys.has(venue.key)) {
         continue;
       }
+
       seenKeys.add(venue.key);
       const roots = findVenueRoots(venue, link);
       for (const root of roots) {
@@ -75,12 +127,10 @@
   }
 
   function findVenueRoots(venue, sourceLink) {
-    const matchingLinks = document.querySelectorAll(
-      `a[href="${CSS.escape(venue.pathname)}"], a[href^="${CSS.escape(venue.pathname)}?"]`
-    );
+    const links = activeAdapter.findMatchingLinks(venue);
     const roots = new Set();
 
-    for (const link of matchingLinks) {
+    for (const link of links) {
       const root = findCardRoot(link, venue);
       if (root) {
         roots.add(root);
@@ -108,11 +158,7 @@
         const venueLinks = getVenueLinksWithin(current);
         const uniqueKeys = new Set(venueLinks.map((item) => item.key));
 
-        if (
-          area > 18000 &&
-          uniqueKeys.size <= 1 &&
-          uniqueKeys.has(venue.key)
-        ) {
+        if (area > 18000 && uniqueKeys.size <= 1 && uniqueKeys.has(venue.key)) {
           best = current;
         }
 
@@ -120,6 +166,7 @@
           break;
         }
       }
+
       current = current.parentElement;
     }
 
@@ -127,16 +174,14 @@
   }
 
   function getVenueLinksWithin(node) {
-    return Array.from(
-      node.querySelectorAll("a[href*='/restaurant/'], a[href*='/venue/']")
-    )
-      .map((link) => getVenueFromLink(link))
+    return activeAdapter.getLinksWithin(node)
+      .map((link) => activeAdapter.getVenueFromLink(link))
       .filter(Boolean);
   }
 
   function decorateVenueRoot(root, venue) {
     root.setAttribute(ROOT_ATTR, "true");
-    root.dataset.woltBlockerKey = venue.key;
+    root.dataset.deliveryHiderKey = venue.key;
     const buttonMount = getButtonMount(root);
 
     if (!processedRoots.has(buttonMount)) {
@@ -154,6 +199,7 @@
         event.stopPropagation();
         await blockVenue(venue);
       });
+
       buttonMount.appendChild(button);
       processedRoots.add(buttonMount);
     }
@@ -162,7 +208,7 @@
   }
 
   function applyPageLevelBlocking() {
-    const currentVenue = getVenueFromPathname(location.pathname);
+    const currentVenue = activeAdapter.getCurrentVenue();
     const existingBanner = document.querySelector(`[${PAGE_BANNER_ATTR}]`);
 
     if (!currentVenue || !isBlocked(currentVenue.key)) {
@@ -179,14 +225,14 @@
     banner.setAttribute(PAGE_BANNER_ATTR, "true");
     banner.innerHTML = `
       <div>
-        <strong>This venue is blocked</strong>
-        <span>It will stay hidden from Wolt listings until you unblock it.</span>
+        <strong>This place is hidden</strong>
+        <span>It will stay hidden from ${activeAdapter.label} listings until you unblock it.</span>
       </div>
     `;
 
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = "Unblock";
+    button.textContent = "Unhide";
     button.addEventListener("click", async () => {
       await unblockVenue(currentVenue.key);
     });
@@ -196,27 +242,30 @@
     mount.parentElement?.insertBefore(banner, mount);
   }
 
-  function injectPageBannerIfNeeded() {
-    const currentVenue = getVenueFromPathname(location.pathname);
-    const existingBanner = document.querySelector(`[${PAGE_BANNER_ATTR}]`);
+  function injectPageButtonIfNeeded() {
+    if (!activeAdapter) {
+      return;
+    }
 
-    if (!currentVenue) {
+    const currentVenue = activeAdapter.getCurrentVenue();
+    const existingBanner = document.querySelector(`[${PAGE_BANNER_ATTR}]`);
+    const title = activeAdapter.getPageTitleNode();
+
+    if (!currentVenue || !title) {
       existingBanner?.remove();
+      title?.parentElement?.querySelector(`[${PAGE_BUTTON_ATTR}]`)?.remove();
       return;
     }
 
     if (isBlocked(currentVenue.key)) {
       applyPageLevelBlocking();
+      title.parentElement?.querySelector(`[${PAGE_BUTTON_ATTR}]`)?.remove();
       return;
     }
 
     existingBanner?.remove();
-    if (title.parentElement?.querySelector(`[${BUTTON_ATTR}]`)) {
-      return;
-    }
 
-    const title = document.querySelector("h1");
-    if (!title) {
+    if (title.parentElement?.querySelector(`[${PAGE_BUTTON_ATTR}]`)) {
       return;
     }
 
@@ -227,35 +276,39 @@
     button.style.pointerEvents = "auto";
     button.style.position = "static";
     button.style.marginLeft = "12px";
-    button.textContent = "Hide this venue";
+    button.textContent = "Hide this place";
+    button.setAttribute(PAGE_BUTTON_ATTR, "true");
     button.addEventListener("click", async () => {
-      const venue = getVenueFromPathname(location.pathname, title.textContent || "");
+      const venue = activeAdapter.getCurrentVenue();
       if (venue) {
         await blockVenue(venue);
       }
     });
 
-    if (title.parentElement && !title.parentElement.querySelector(`[${BUTTON_ATTR}]`)) {
-      button.setAttribute(BUTTON_ATTR, "true");
-      title.insertAdjacentElement("afterend", button);
-    }
+    title.insertAdjacentElement("afterend", button);
   }
 
   async function blockVenue(venue) {
+    const previous = blockedVenues[venue.key] || {};
     blockedVenues[venue.key] = {
-      key: venue.key,
-      name: venue.name,
-      pathname: venue.pathname,
-      type: venue.type,
+      ...previous,
+      ...venue,
       blockedAt: new Date().toISOString()
     };
-    await saveBlockedVenues();
+    localStats = updateLocalStats(localStats, venue, "block");
+    telemetryQueue = enqueueTelemetryEvent(telemetryQueue, telemetrySettings, venue, "hide");
+    await saveAll();
     scanPage();
   }
 
   async function unblockVenue(key) {
+    const venue = blockedVenues[key];
+    if (venue) {
+      localStats = updateLocalStats(localStats, venue, "unblock");
+      telemetryQueue = enqueueTelemetryEvent(telemetryQueue, telemetrySettings, venue, "unhide");
+    }
     delete blockedVenues[key];
-    await saveBlockedVenues();
+    await saveAll();
     scanPage();
   }
 
@@ -263,66 +316,60 @@
     return Boolean(blockedVenues[key]);
   }
 
-  async function loadBlockedVenues() {
-    const result = await chrome.storage.sync.get(STORAGE_KEY);
-    return result[STORAGE_KEY] || {};
-  }
-
-  async function saveBlockedVenues() {
+  async function saveAll() {
     await chrome.storage.sync.set({
-      [STORAGE_KEY]: blockedVenues
+      [STORAGE_KEY]: blockedVenues,
+      [STATS_KEY]: localStats,
+      [TELEMETRY_SETTINGS_KEY]: telemetrySettings,
+      [TELEMETRY_QUEUE_KEY]: telemetryQueue
     });
   }
 
-  function getVenueFromLink(link) {
-    if (!(link instanceof HTMLAnchorElement) || !link.href) {
-      return null;
-    }
-
-    const url = new URL(link.href, location.origin);
-    return getVenueFromPathname(url.pathname, getVenueName(link));
+  async function loadObject(key) {
+    const result = await chrome.storage.sync.get(key);
+    return result[key] || {};
   }
 
-  function getVenueFromPathname(pathname, fallbackName = "") {
-    const match = pathname.match(/^\/[^/]+\/[^/]+\/[^/]+\/(restaurant|venue)\/([^/?#]+)/);
-    if (!match) {
-      return null;
-    }
+  async function loadArray(key) {
+    const result = await chrome.storage.sync.get(key);
+    return result[key] || [];
+  }
 
-    const type = match[1];
-    const slug = decodeURIComponent(match[2]);
-    return {
-      key: `${type}:${slug}`,
-      slug,
-      type,
-      pathname: pathname.replace(/\/+$/, ""),
-      name: fallbackName.trim() || humanizeSlug(slug)
+  function updateLocalStats(stats, venue, action) {
+    const next = { ...stats };
+    const existing = next[venue.key] || {
+      key: venue.key,
+      name: venue.name,
+      platform: venue.platform,
+      type: venue.type,
+      pathname: venue.pathname,
+      blockCount: 0,
+      unblockCount: 0
     };
+
+    existing.name = venue.name;
+    existing.platform = venue.platform;
+    existing.type = venue.type;
+    existing.pathname = venue.pathname;
+    existing.lastActionAt = new Date().toISOString();
+
+    if (action === "block") {
+      existing.blockCount += 1;
+    } else {
+      existing.unblockCount += 1;
+    }
+
+    next[venue.key] = existing;
+    return next;
   }
 
-  function getVenueName(link) {
-    const ariaLabel = link.getAttribute("aria-label");
-    if (ariaLabel) {
-      return ariaLabel;
-    }
-
-    const heading = link.querySelector("h1, h2, h3, h4, h5, h6");
-    if (heading?.textContent) {
-      return heading.textContent.trim();
-    }
-
-    const text = (link.textContent || "").trim();
-    if (text) {
-      return text.split("\n").map((part) => part.trim()).filter(Boolean)[0] || text;
-    }
-
-    return "";
+  function getPlatformSummary(platformId) {
+    const adapter = adapters.find((item) => item.id === platformId);
+    return adapter ? { id: adapter.id, label: adapter.label } : null;
   }
 
-  function humanizeSlug(slug) {
-    return slug
-      .replace(/[-_]+/g, " ")
-      .replace(/\b\w/g, (char) => char.toUpperCase());
+  function getActiveAdapter() {
+    return adapters.find((adapter) => adapter.matchesLocation(location));
   }
 
   function getButtonMount(root) {
@@ -338,5 +385,229 @@
     const venueLinks = getVenueLinksWithin(parent);
     const uniqueKeys = new Set(venueLinks.map((item) => item.key));
     return uniqueKeys.size <= 1 ? parent : root;
+  }
+
+  function createBaseVenue(adapter, details) {
+    return {
+      ...details,
+      platform: adapter.id,
+      platformLabel: adapter.label,
+      key: `${adapter.id}:${details.type}:${details.slug}`
+    };
+  }
+
+  function getTextLabel(link) {
+    const ariaLabel = link.getAttribute("aria-label");
+    if (ariaLabel) {
+      return ariaLabel.trim();
+    }
+
+    const heading = link.querySelector("h1, h2, h3, h4, h5, h6");
+    if (heading?.textContent) {
+      return heading.textContent.trim();
+    }
+
+    const text = (link.textContent || "").trim();
+    if (!text) {
+      return "";
+    }
+
+    return text.split("\n").map((part) => part.trim()).filter(Boolean)[0] || text;
+  }
+
+  function humanizeSlug(slug) {
+    return slug
+      .replace(/[-_]+/g, " ")
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  function enqueueTelemetryEvent(queue, settings, venue, action) {
+    if (!settings?.enabled) {
+      return queue;
+    }
+
+    const next = queue.slice(-199);
+    next.push({
+      action,
+      country: inferCountryCode(),
+      createdAt: new Date().toISOString(),
+      extensionVersion: chrome.runtime.getManifest().version,
+      platform: venue.platform,
+      type: venue.type,
+      venueKey: venue.key,
+      venueName: venue.name
+    });
+    return next;
+  }
+
+  function inferCountryCode() {
+    const segments = location.pathname.split("/").filter(Boolean);
+    if (location.hostname === "wolt.com" && segments.length >= 2) {
+      return segments[1].slice(0, 3).toUpperCase();
+    }
+
+    if (location.hostname === "food.bolt.eu" && segments.length >= 1) {
+      return segments[0].slice(0, 2).toUpperCase();
+    }
+
+    if (location.hostname.endsWith("foody.com.cy")) {
+      return "CY";
+    }
+
+    return "UN";
+  }
+
+  function createWoltAdapter() {
+    const selector = "a[href*='/restaurant/'], a[href*='/venue/']";
+
+    return {
+      id: "wolt",
+      label: "Wolt",
+      matchesLocation(currentLocation) {
+        return currentLocation.hostname === "wolt.com";
+      },
+      getListingLinks() {
+        return Array.from(document.querySelectorAll(selector));
+      },
+      getLinksWithin(node) {
+        return Array.from(node.querySelectorAll(selector));
+      },
+      findMatchingLinks(venue) {
+        return Array.from(document.querySelectorAll(
+          `a[href="${CSS.escape(venue.pathname)}"], a[href^="${CSS.escape(venue.pathname)}?"]`
+        ));
+      },
+      getPageTitleNode() {
+        return document.querySelector("h1");
+      },
+      getCurrentVenue() {
+        return this.getVenueFromPathname(location.pathname, document.querySelector("h1")?.textContent || "");
+      },
+      getVenueFromLink(link) {
+        if (!(link instanceof HTMLAnchorElement) || !link.href) {
+          return null;
+        }
+
+        const url = new URL(link.href, location.origin);
+        return this.getVenueFromPathname(url.pathname, getTextLabel(link));
+      },
+      getVenueFromPathname(pathname, fallbackName = "") {
+        const match = pathname.match(/^\/[^/]+\/[^/]+\/[^/]+\/(restaurant|venue)\/([^/?#]+)/);
+        if (!match) {
+          return null;
+        }
+
+        const type = match[1];
+        const slug = decodeURIComponent(match[2]);
+        return createBaseVenue(this, {
+          slug,
+          type,
+          pathname: pathname.replace(/\/+$/, ""),
+          name: fallbackName.trim() || humanizeSlug(slug)
+        });
+      }
+    };
+  }
+
+  function createFoodyAdapter() {
+    const selector = "a[href*='/delivery/menu/']";
+
+    return {
+      id: "foody",
+      label: "Foody",
+      matchesLocation(currentLocation) {
+        return currentLocation.hostname === "www.foody.com.cy" || currentLocation.hostname === "foody.com.cy";
+      },
+      getListingLinks() {
+        return Array.from(document.querySelectorAll(selector));
+      },
+      getLinksWithin(node) {
+        return Array.from(node.querySelectorAll(selector));
+      },
+      findMatchingLinks(venue) {
+        return Array.from(document.querySelectorAll(
+          `a[href="${CSS.escape(venue.pathname)}"], a[href^="${CSS.escape(venue.pathname)}?"]`
+        ));
+      },
+      getPageTitleNode() {
+        return document.querySelector("h1");
+      },
+      getCurrentVenue() {
+        return this.getVenueFromPathname(location.pathname, document.querySelector("h1")?.textContent || "");
+      },
+      getVenueFromLink(link) {
+        if (!(link instanceof HTMLAnchorElement) || !link.href) {
+          return null;
+        }
+
+        const url = new URL(link.href, location.origin);
+        return this.getVenueFromPathname(url.pathname, getTextLabel(link));
+      },
+      getVenueFromPathname(pathname, fallbackName = "") {
+        const match = pathname.match(/^\/delivery\/menu\/([^/?#]+)/);
+        if (!match) {
+          return null;
+        }
+
+        const slug = decodeURIComponent(match[1]);
+        return createBaseVenue(this, {
+          slug,
+          type: "store",
+          pathname: pathname.replace(/\/+$/, ""),
+          name: fallbackName.trim() || humanizeSlug(slug)
+        });
+      }
+    };
+  }
+
+  function createBoltFoodAdapter() {
+    const selector = "a[href*='/p/']";
+
+    return {
+      id: "bolt-food",
+      label: "Bolt Food",
+      matchesLocation(currentLocation) {
+        return currentLocation.hostname === "food.bolt.eu";
+      },
+      getListingLinks() {
+        return Array.from(document.querySelectorAll(selector)).filter((link) => this.getVenueFromLink(link));
+      },
+      getLinksWithin(node) {
+        return Array.from(node.querySelectorAll(selector)).filter((link) => this.getVenueFromLink(link));
+      },
+      findMatchingLinks(venue) {
+        return Array.from(document.querySelectorAll(
+          `a[href="${CSS.escape(venue.pathname)}"], a[href^="${CSS.escape(venue.pathname)}?"]`
+        ));
+      },
+      getPageTitleNode() {
+        return document.querySelector("h1");
+      },
+      getCurrentVenue() {
+        return this.getVenueFromPathname(location.pathname, document.querySelector("h1")?.textContent || "");
+      },
+      getVenueFromLink(link) {
+        if (!(link instanceof HTMLAnchorElement) || !link.href) {
+          return null;
+        }
+
+        const url = new URL(link.href, location.origin);
+        return this.getVenueFromPathname(url.pathname, getTextLabel(link));
+      },
+      getVenueFromPathname(pathname, fallbackName = "") {
+        const match = pathname.match(/^\/[^/]+\/[^/]+\/p\/(\d+)-([^/?#]+)/);
+        if (!match) {
+          return null;
+        }
+
+        const slug = `${match[1]}-${decodeURIComponent(match[2])}`;
+        return createBaseVenue(this, {
+          slug,
+          type: "store",
+          pathname: pathname.replace(/\/+$/, ""),
+          name: fallbackName.trim() || humanizeSlug(match[2])
+        });
+      }
+    };
   }
 })();

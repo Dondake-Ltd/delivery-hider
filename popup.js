@@ -1,4 +1,5 @@
 const STORAGE_KEY = "blockedVenues";
+const MESSAGE_TYPE = "DELIVERY_HIDER_GET_PAGE_STATE";
 const statusNode = document.getElementById("status");
 const toggleButton = document.getElementById("toggle-current");
 const countNode = document.getElementById("blocked-count");
@@ -35,32 +36,32 @@ async function loadCurrentTabState() {
   let pageState = null;
   try {
     pageState = await chrome.tabs.sendMessage(tab.id, {
-      type: "WOLT_BLOCKER_GET_PAGE_STATE"
+      type: MESSAGE_TYPE
     });
   } catch (_error) {
     pageState = null;
   }
 
-  if (!pageState?.isWolt) {
-    statusNode.textContent = "Open Wolt in this tab to block a venue directly.";
-    toggleButton.textContent = "Open a Wolt venue page";
+  if (!pageState?.isSupported) {
+    statusNode.textContent = "Open Wolt, Foody, or Bolt Food in this tab to hide a place directly.";
+    toggleButton.textContent = "Open a supported place page";
     toggleButton.disabled = true;
     return;
   }
 
   currentVenue = pageState.venue;
   if (!currentVenue) {
-    statusNode.textContent = "Open a specific restaurant or shop page to block it from the popup.";
-    toggleButton.textContent = "Open a Wolt venue page";
+    statusNode.textContent = `Open a specific ${pageState.platform?.label || "supported"} place page to hide it from the popup.`;
+    toggleButton.textContent = "Open a place page";
     toggleButton.disabled = true;
     return;
   }
 
   const blocked = Boolean(pageState.isBlocked);
   statusNode.textContent = blocked
-    ? `${currentVenue.name} is currently blocked.`
-    : `${currentVenue.name} is visible.`;
-  toggleButton.textContent = blocked ? "Unblock this venue" : "Block this venue";
+    ? `${currentVenue.name} is currently hidden on ${pageState.platform?.label || "this platform"}.`
+    : `${currentVenue.name} is visible on ${pageState.platform?.label || "this platform"}.`;
+  toggleButton.textContent = blocked ? "Unhide this place" : "Hide this place";
   toggleButton.disabled = false;
 }
 
